@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="sr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPECTRA // TITAN CORE</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --brand-primary: #a855f7;
+            --brand-secondary: #06b6d4;
+            --bg-deep: #08080a;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: var(--bg-deep);
+            color: #f1f5f9;
+            /* Subtilniji grid za 'pro' izgled */
+            background-image: radial-gradient(circle at 2px 2px, rgba(168, 85, 247, 0.03) 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+
+        .panel-blur {
+            background: rgba(15, 15, 20, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            box-shadow: 0 0 40px -10px rgba(0,0,0,0.5);
+        }
+
+        /* Uklanjanje default focus ringova za čistiji UI */
+        textarea:focus { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2); }
+
+        @keyframes scan {
+            0% { transform: translateY(-100%); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(1000%); opacity: 0; }
+        }
+        .scan-line { animation: scan 2s linear infinite; }
+    </style>
+</head>
+<body class="antialiased min-h-screen">
+
+    <nav class="border-b border-white/5 bg-black/20 px-6 py-4">
+        <div class="max-w-[1700px] mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="p-2.5 bg-gradient-to-tr from-purple-600 to-cyan-500 rounded-xl shadow-lg shadow-purple-500/10">
+                    <i data-lucide="binary" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight text-white leading-none uppercase">Spectra <span class="text-cyan-400 font-light italic text-lg">v25</span></h1>
+                    <span class="text-[9px] text-zinc-500 font-bold tracking-[0.2em] uppercase">Core Engine // Titan-7</span>
+                </div>
+            </div>
+
+            <div class="hidden md:flex items-center gap-8">
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Processing Latency</span>
+                    <span id="speedMetric" class="text-sm font-mono text-cyan-400">0.00ms</span>
+                </div>
+                <div class="h-8 w-[1px] bg-white/10"></div>
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Buffer Status</span>
+                    <span class="text-sm font-mono text-emerald-400 italic font-bold">OPTIMIZED</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-[1700px] mx-auto p-6 lg:p-10 grid lg:grid-cols-12 gap-8">
+        
+        <aside class="lg:col-span-4 space-y-6">
+            <div class="panel-blur p-6 rounded-3xl border border-white/10 relative overflow-hidden group">
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xs font-black text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                            <i data-lucide="database" class="w-3.5 h-3.5 text-purple-500"></i> Input Stream
+                        </h3>
+                        <div id="charCounter" class="text-[10px] px-2 py-0.5 bg-white/5 rounded text-zinc-500">0 / 11K</div>
+                    </div>
+                    
+                    <textarea id="rawInput" 
+                        class="w-full h-80 bg-black/40 border border-white/5 rounded-2xl p-5 text-sm font-mono leading-relaxed outline-none transition-all placeholder:text-zinc-800 custom-scroll"
+                        placeholder="// Paste your payload here..."></textarea>
+                    
+                    <button id="triggerEncode" class="w-full mt-6 py-5 bg-white text-black rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-cyan-400 transition-all active:scale-[0.97]">
+                        Compile Matrix
+                    </button>
+
+                    <div class="grid grid-cols-2 gap-3 mt-3">
+                        <button id="downloadBtn" class="flex items-center justify-center gap-2 py-3 bg-zinc-900 border border-white/5 rounded-xl hover:border-cyan-500/30 transition-colors">
+                            <i data-lucide="save" class="w-4 h-4 text-cyan-500"></i>
+                            <span class="text-[10px] font-bold uppercase tracking-tighter">Export</span>
+                        </button>
+                        <label class="flex items-center justify-center gap-2 py-3 bg-zinc-900 border border-white/5 rounded-xl cursor-pointer hover:border-purple-500/30 transition-colors">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 text-purple-500"></i>
+                            <span class="text-[10px] font-bold uppercase tracking-tighter">Restore</span>
+                            <input type="file" id="uploadInput" class="hidden" accept="image/*">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="panel-blur p-4 rounded-2xl">
+                    <span class="block text-[8px] text-zinc-500 uppercase font-black mb-1">Encoding</span>
+                    <span class="text-[11px] font-bold text-zinc-300">LAB-FIXED 8-BIT</span>
+                </div>
+                <div class="panel-blur p-4 rounded-2xl">
+                    <span class="block text-[8px] text-zinc-500 uppercase font-black mb-1">Redundancy</span>
+                    <span class="text-[11px] font-bold text-zinc-300">9-PT KERNEL</span>
+                </div>
+            </div>
+        </aside>
+
+        <section class="lg:col-span-8">
+            <div class="panel-blur p-2 rounded-3xl border border-white/5 overflow-hidden relative shadow-2xl">
+                <div id="scanner" class="absolute inset-0 pointer-events-none z-20 hidden">
+                    <div class="w-full h-1 bg-cyan-400/40 shadow-[0_0_15px_cyan] scan-line"></div>
+                </div>
+                <canvas id="renderSurface" width="1300" height="900" class="w-full block"></canvas>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="outputModal" class="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/95 backdrop-blur-sm hidden">
+        <div class="panel-blur max-w-3xl w-full p-10 rounded-[2.5rem] border border-cyan-500/20 shadow-2xl">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+                    <i data-lucide="terminal-square" class="text-cyan-400"></i>
+                    Extracted Payload
+                </h2>
+                <button onclick="document.getElementById('outputModal').classList.add('hidden')" class="p-2 hover:bg-white/5 rounded-lg">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            
+            <div id="rawOutput" class="bg-black/60 p-8 rounded-2xl border border-white/5 h-64 overflow-y-auto text-sm font-mono text-cyan-50/80 leading-relaxed custom-scroll italic"></div>
+            
+            <button id="copyBtn" class="w-full mt-8 py-5 bg-cyan-500 text-black rounded-2xl font-black uppercase text-xs tracking-[0.3em] hover:bg-cyan-400 transition-shadow shadow-lg shadow-cyan-500/20">
+                Copy to Clipboard
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Init Icons
+        lucide.createIcons();
+
+        // --------------------------------------------------
+        // CORE ENGINE CONFIG
+        // --------------------------------------------------
+        const CFG = {
+            cols: 130,
+            rows: 90,
+            pixelSize: 10,
+            anchorSize: 7,
+            metaX: 7, 
+            metaY: 0,
+            charset: " abcčćdđefghijklljmnnjoprsštuvzžABCČĆDĐEFGHIJKLLJMNNJOPRSŠTUVZŽ0123456789.,!?():;-+*/=@#$%^&_[]{}<>|~'\"\\qwyxQWYX\n\r\t".split("")
+        };
+
+        const surface = document.getElementById('renderSurface');
+        const ctx = surface.getContext('2d', { alpha: false, willReadFrequently: true });
+        const inputField = document.getElementById('rawInput');
+
+        // Color Mapping (Golden Ratio distribution)
+        const MASTER_PALETTE = CFG.charset.map((char, i) => {
+            const h = (i * 137.5) % 360;
+            const l = (i % 2 === 0) ? 60 : 45;
+            return {
+                char,
+                rgb: `hsl(${h}, 80%, ${l}%)`,
+                values: hslToRgb(h/360, 0.8, l/100)
+            };
+        });
+
+        function hslToRgb(h, s, l) {
+            let r, g, b;
+            if (s === 0) r = g = b = l;
+            else {
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+        function hue2rgb(p, q, t) {
+            if (t < 0) t += 1; if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        }
+
+        const isSystemSpace = (x, y) => {
+            const m = CFG.anchorSize;
+            const isAnchor = (x < m && y < m) || (x >= CFG.cols - m && y < m) || (x < m && y >= CFG.rows - m) || (x >= CFG.cols - m && y >= CFG.rows - m);
+            const isMeta = (x === CFG.metaX && y === CFG.metaY);
+            return isAnchor || isMeta;
+        };
+
+        // --------------------------------------------------
+        // PROCESSORS
+        // --------------------------------------------------
+        const renderMatrix = () => {
+            const ts = performance.now();
+            const text = inputField.value;
+            const total = text.length;
+
+            // Reset Canvas
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(0, 0, surface.width, surface.height);
+
+            // Draw Anchors (Calibration marks)
+            const marks = [[0,0], [CFG.cols-7,0], [0,CFG.rows-7], [CFG.cols-7,CFG.rows-7]];
+            marks.forEach(([ax, ay]) => {
+                ctx.fillStyle = "#ffffff"; ctx.fillRect(ax*10, ay*10, 70, 70);
+                ctx.fillStyle = "#000000"; ctx.fillRect((ax+1)*10, (ay+1)*10, 50, 50);
+                ctx.fillStyle = "#06b6d4"; ctx.fillRect((ax+2)*10, (ay+2)*10, 30, 30);
+            });
+
+            // Write Meta (Length)
+            ctx.fillStyle = `rgb(${Math.floor(total/255)}, ${total%255}, 200)`;
+            ctx.fillRect(CFG.metaX * 10, CFG.metaY * 10, 10, 10);
+
+            // Populate Data
+            let charPtr = 0;
+            for (let y = 0; y < CFG.rows; y++) {
+                for (let x = 0; x < CFG.cols; x++) {
+                    if (!isSystemSpace(x, y) && charPtr < total) {
+                        const map = MASTER_PALETTE.find(m => m.char === text[charPtr]) || MASTER_PALETTE[0];
+                        ctx.fillStyle = map.rgb;
+                        ctx.fillRect(x * 10, y * 10, 10, 10);
+                        charPtr++;
+                    }
+                }
+            }
+
+            document.getElementById('charCounter').innerText = `${total} / 11K`;
+            document.getElementById('speedMetric').innerText = `${(performance.now() - ts).toFixed(2)}ms`;
+        };
+
+        const executeRecovery = async (imgSource = surface) => {
+            const scanner = document.getElementById('scanner');
+            scanner.classList.remove('hidden');
+            
+            const start = performance.now();
+            await new Promise(r => setTimeout(r, 800)); // Simulating processing
+
+            const offscreen = document.createElement('canvas');
+            offscreen.width = surface.width; offscreen.height = surface.height;
+            const octx = offscreen.getContext('2d');
+            octx.drawImage(imgSource, 0, 0);
+            const rawData = octx.getImageData(0, 0, offscreen.width, offscreen.height).data;
+
+            // Read Length
+            const mIdx = (0 * offscreen.width + (CFG.metaX * 10 + 5)) * 4;
+            const target = rawData[mIdx] * 255 + rawData[mIdx+1];
+
+            let recovered = "";
+            let count = 0;
+
+            for (let y = 0; y < CFG.rows; y++) {
+                for (let x = 0; x < CFG.cols; x++) {
+                    if (isSystemSpace(x, y)) continue;
+                    if (count >= target) break;
+
+                    // 9-Point Sampling for noise reduction
+                    const cx = x * 10 + 5;
+                    const cy = y * 10 + 5;
+                    let r=0, g=0, b=0;
+                    const pts = [[0,0], [-2,-2], [2,-2], [-2,2], [2,2], [0,-2], [0,2], [-2,0], [2,0]];
+                    
+                    pts.forEach(([ox, oy]) => {
+                        const i = (Math.floor(cy + oy) * offscreen.width + Math.floor(cx + ox)) * 4;
+                        r += rawData[i]; g += rawData[i+1]; b += rawData[i+2];
+                    });
+                    
+                    r/=9; g/=9; b/=9;
+
+                    let match = "?", dist = Infinity;
+                    for (let p of MASTER_PALETTE) {
+                        const d = Math.pow(r-p.values[0], 2) + Math.pow(g-p.values[1], 2) + Math.pow(b-p.values[2], 2);
+                        if (d < dist) { dist = d; match = p.char; }
+                    }
+                    recovered += match;
+                    count++;
+                }
+            }
+
+            scanner.classList.add('hidden');
+            document.getElementById('rawOutput').innerText = recovered;
+            document.getElementById('outputModal').classList.remove('hidden');
+            document.getElementById('speedMetric').innerText = `${(performance.now() - start).toFixed(2)}ms`;
+        };
+
+        // --------------------------------------------------
+        // EVENTS
+        // --------------------------------------------------
+        inputField.addEventListener('input', renderMatrix);
+        document.getElementById('triggerEncode').onclick = renderMatrix;
+        
+        document.getElementById('downloadBtn').onclick = () => {
+            const lnk = document.createElement('a');
+            lnk.download = `SPECTRA_CORE_${Date.now()}.png`;
+            lnk.href = surface.toDataURL();
+            lnk.click();
+        };
+
+        document.getElementById('uploadInput').onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new Image();
+                img.onload = () => executeRecovery(img);
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        };
+
+        document.getElementById('copyBtn').onclick = () => {
+            navigator.clipboard.writeText(document.getElementById('rawOutput').innerText);
+        };
+
+        // Boot
+        renderMatrix();
+
+    </script>
+</body>
+</html>
